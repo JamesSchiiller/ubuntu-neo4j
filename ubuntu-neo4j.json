@@ -1,0 +1,173 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Template to launch an Amazon Linux instance.",
+  "Parameters": {
+    "KeyName": {
+      "Type": "String"
+    }
+  },
+  "Mappings": {
+    "RegionMap" : {
+      "us-east-1"      : { "AMI" : "ami-e13739f6" }
+    }
+  },
+  "Resources": {
+    "ElasticIP": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "InstanceId": {
+            "Ref": "Ec2Instance"
+        }
+      }
+    },
+    "Ec2Instance": {
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+            "config": {
+                "files": {
+                    "/tmp/sample.conf": {
+                      "content": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "write a sample file to OS and give permissions....   \n"
+                            ]
+                        ]
+                      },
+                      "mode": "000644",
+                      "owner": "root",
+                      "group": "root"
+                    }, 
+                    "/etc/init.d/neo4j": {
+                      "content": {
+                        "Fn::Join": [
+                          "", 
+                          [
+			      "#! /bin/sh\n", 
+                              "### BEGIN INIT INFO\n",
+                              "# Provides: neo4j\n",
+                              "# Required-Start: $remote_fs $syslog\n",
+                              "# Required-Stop: $remote_fs $syslog\n",
+                              "# Default-Start: 2 3 4 5\n",
+                              "# Default-Stop: 0 1 6\n",
+                              "# Short-Description: neo4j\n",
+                              "# Description: This file starts and stops neo4j server\n",
+                              "# \n",
+                              "### END INIT INFO\n",
+                              "export NEO4J_HOME=/opt/neo4j-current\n",
+
+                              "case \"$1\" in\n",
+                              " start)\n",
+                              "    $NEO4J_HOME/bin/neo4j start\n",
+                              "   ;;\n",
+                              " stop)\n",
+                              "    $NEO4J_HOME/bin/neo4j stop\n",
+                              "   ;;\n",
+                              " restart)\n",
+                              "   $NEO4J_HOME/bin/neo4j restart\n",
+                              "   ;;\n",
+                              " console)\n",
+                              "   $NEO4J_HOME/bin/neo4j console\n",
+                              "   ;;\n",
+                              " status)\n",
+                              "   $NEO4J_HOME/bin/neo4j status\n",
+                              "   ;;\n",
+                              " *)\n",
+                              "   echo \"Usage: neo4j {!console|start|stop|restart|status}\" >&2\n",
+                              "   exit 3\n",
+                              "   ;;\n",
+                              "esac\n"
+	                 ]
+                       ]
+                      }, 
+                      "mode": "000755",
+                      "owner": "root",
+                      "group": "root"
+                   }
+                }, 
+                "commands": {
+                   "start-neo4j-on-restart": {"command": "update-rc.d neo4j defaults"}, 
+		   "restart": {"command": "reboot"}
+                }
+            }
+        }
+      },
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId":  {"Fn::FindInMap":["RegionMap", {"Ref" : "AWS::Region" }, "AMI" ]},
+        "InstanceType" : "t2.micro", 
+        "KeyName": { "Ref": "KeyName" },
+        "SecurityGroups": [ { "Ref": "WebSecurityGroup" } ], 
+        "UserData": {
+          "Fn::Base64": { "Fn::Join": [ "", [
+                "#!/bin/bash -v\n",
+                "sudo touch /home/ubuntu/test.txt\n", 
+                "export DEBIAN_FRONTEND=noninteractive\n",
+                "apt-get update && apt-get upgrade -y\n",
+                "sudo apt install default-jre default-jre-headless -y\n", 
+                "wget -P /home/ubuntu https://neo4j.com/artifact.php\\?name=neo4j-community-3.2.3-unix.tar.gz\n", 
+                "sudo cp /home/ubuntu/artifact.php\\?name\\=neo4j-community-3.2.3-unix.tar.gz /opt/\n", 
+                "cd /opt\n",  
+                "sudo tar -xvf artifact.php\\?name\\=neo4j-community-3.2.3-unix.tar.gz\n", 
+                "sudo ln -s /opt/neo4j-community-3.2.3 /opt/neo4j-current\n", 
+                "echo 'export NEO4J_HOME=/opt/neo4j-current' >> /home/ubuntu/.profile\n", 
+                "echo 'export PATH=$PATH:$NEO4J_HOME/bin' >> /home/ubuntu/.profile\n", 
+                "/etc/init.d/ update-rc.d neo4j defaults\n", 
+                "echo 'dbms.connectors.default_listen_address=0.0.0.0' | sudo tee --append /opt/neo4j-community-3.2.3/conf/neo4j.conf\n", 
+                "apt-get -y install python-setuptools\n",
+                "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+                "/usr/local/bin/cfn-init --stack ", 
+                { "Ref":"AWS::StackName" }, 
+                " --resource Ec2Instance", 
+                " --region ", { "Ref": "AWS::Region" }, "\n"]
+	    ]
+          }
+        }
+      }
+    },
+    "WebSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+	"GroupDescription": "Enable tcp access for Web and SSH traffic from outside",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "7474",
+            "ToPort": "7474",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "7687",
+            "ToPort": "7687",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "InstanceId": {
+      "Description": "Instance ID of the Web Server",
+      "Value": { "Ref": "Ec2Instance" }
+    },
+    "AZ": {
+      "Description": "Instances is running in Availability Zone ",
+      "Value": { "Fn::GetAtt": [ "Ec2Instance", "AvailabilityZone" ] }
+    },
+    "PublicIP": {
+      "Description": "Public IP",
+      "Value": { "Fn::GetAtt": [ "Ec2Instance", "PublicIp" ] }
+    },
+    "PublicDNS": {
+      "Description": "Instance Public DNS Name",
+      "Value": { "Fn::GetAtt": [ "Ec2Instance", "PublicDnsName" ] }
+    }
+  }
+}
