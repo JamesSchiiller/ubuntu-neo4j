@@ -1,17 +1,10 @@
-1. CloudFormation fails to run `update-rc.d neo4j defaults`, starting neo4j upon restart, even if specified in template (SOMEONE HELP FIX! PLEASE!).
+1. Navigate to elasticip:7474
 
-In the meantime, ssh into instance and run, 
+2. Default username: neo4j, password: neo4j
 
-ubuntu@ip-172-31-62-107:/var/log$ sudo update-rc.d neo4j defaults
-ubuntu@ip-172-31-62-107:/var/log$ sudo reboot
+3. Set new password
 
-2. Navigate to elasticip:7474
-
-3. Default username: neo4j, password: neo4j
-
-4. Set new password
-
-5. Insert some test data via interactive web console, 
+4. Insert some test data via interactive web console, 
 
 CREATE (n:Person { name: 'James', title: 'Developer' })
 

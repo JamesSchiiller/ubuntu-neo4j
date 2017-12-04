@@ -86,7 +86,7 @@
                    }
                 }, 
                 "commands": {
-                   "start-neo4j-on-restart": {"command": "update-rc.d neo4j defaults"}, 
+                   "01-start-neo4j-on-restart": {"command": "update-rc.d neo4j defaults"}, 
 		   "restart": {"command": "reboot"}
                 }
             }
